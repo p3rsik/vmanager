@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+
 module Manager
     ( 
     ) where
@@ -21,9 +22,13 @@ data Env = Env
 -- Add custom error type
 -- Implement load page
 
+modifyPT :: (MonadError String m, MonadReader Env m, MonadIO m) => Env -> (PageTable -> PageTable) -> m ()
 modifyPT env action = liftIO $ modifyIORef' (pageTable env) action
+modifyFT :: (MonadError String m, MonadReader Env m, MonadIO m) => Env -> (FrameTable -> FrameTable) -> m ()
 modifyFT env action = liftIO $ modifyIORef' (frameTable env) action
+getPageTable :: (MonadError String m, MonadReader Env m, MonadIO m) => Env -> m PageTable
 getPageTable env = liftIO . readIORef $ pageTable env
+getFrameTable :: (MonadError String m, MonadReader Env m, MonadIO m) => Env -> m FrameTable
 getFrameTable env = liftIO . readIORef $ frameTable env
 
 -- Find free frame in RAM(if available), if not, unload frame from RAM to SWAP and use it
@@ -48,8 +53,6 @@ createPage pid = do
 deletePage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
 deletePage page = do
   env <- ask
-  pt <- getPageTable env
-  ft <- getFrameTable env
   modifyPT env $ filter (\el -> el /= page)
   modifyFT env $ (\(FrameTable xs fs ys zs) -> FrameTable (Page.frameId page:xs) fs ys zs)
 
@@ -59,10 +62,9 @@ loadPage = undefined
 
 -- Unload page from RAM to SWAP
 unloadPage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
-unloadPage page@(Page fi po c ir w r pid) = do
+unloadPage page@(Page _ po c _ w r pid) = do
   unless (inRam page) . throwError $ "Trying to unload page that is not in RAM" <> show page
   env <- ask
-  pt <- getPageTable env
   ft <- getFrameTable env
   let ind = Page.frameId page
   let (t, nfi) = case getFreeSwapPage ft of
@@ -76,7 +78,7 @@ unloadPage page@(Page fi po c ir w r pid) = do
   modifyPT env $ fmap (\p -> if page == p then Page nfi po c False w r pid else p)
 
 writePage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
-writePage page@(Page fi po c ir w r pid) = do
+writePage page@(Page fi po c ir _ r pid) = do
   env <- ask
   modifyPT env $ fmap (\p -> if page == p then Page fi po c ir True r pid else p)
   ageWorld
@@ -85,7 +87,6 @@ writePage page@(Page fi po c ir w r pid) = do
 ageWorld :: (MonadError String m, MonadReader Env m, MonadIO m) => m ()
 ageWorld = do
   env <- ask
-  pt <- getPageTable env
   liftIO . modifyIORef' (pageTable env) $ fmap agePage
   where
     agePage :: Page -> Page
@@ -95,7 +96,7 @@ ageWorld = do
       Page fi po c' ir w r pid
 
 readPage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
-readPage page@(Page fi po c ir w r pid) = do
+readPage page@(Page fi po c ir w _ pid) = do
   env <- ask
   modifyPT env $ fmap (\p -> if page == p then Page fi po c ir w True pid else p)
   ageWorld
