@@ -23,6 +23,7 @@ data FrameTable = FrameTable [Word] [Frame] [Word] [Frame]
 -- pop physical page making it not-free
 popFreeRamPage :: FrameTable -> FrameTable
 popFreeRamPage (FrameTable (_:xs) y z zs) = FrameTable xs y z zs
+popFreeRamPage (FrameTable [] y z zs) = FrameTable [] y z zs
 
 -- get free physical page
 getFreeRamPage :: FrameTable -> Maybe Word
@@ -32,6 +33,7 @@ getFreeRamPage (FrameTable [] _ _ _) = Nothing
 -- pop physical page making it not-free
 popFreeSwapPage :: FrameTable -> FrameTable
 popFreeSwapPage (FrameTable xs y (_:z) zs) = FrameTable xs y z zs
+popFreeSwapPage (FrameTable xs y [] zs) = FrameTable xs y [] zs
 
 -- get free physical page
 getFreeSwapPage :: FrameTable -> Maybe Word
