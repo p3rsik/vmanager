@@ -33,6 +33,10 @@ library:
   default-extensions:
     - OverloadedStrings
     - NoImplicitPrelude
+    - DataKinds
+    - KindSignatures
+    - NamedFieldPuns
+    - TypeApplications
 
 executables:
   vmanager-exe:

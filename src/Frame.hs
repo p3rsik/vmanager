@@ -9,15 +9,15 @@ import Foundation.Collection
 import Control.Effect.State
 import Types
 
-data Frame a = Frame
+data Frame (a :: MemType) = Frame
              { frameId :: FrameId -- Actually, FrameId is also Frame offset
              , mem :: [Word8]
              } deriving (Show, Eq)
 
-data FrameTable = FT { ramFreeOffs :: [Offset (Frame RAM)]
-                     , ramF :: NonEmpty [Frame RAM] -- RAM frames
-                     , swapFreeOffs :: [Offset (Frame SWAP)]
-                     , swapF :: NonEmpty [Frame SWAP] -- SWAP frames
+data FrameTable = FT { ramFreeOffs :: [Offset (Frame 'Ram)]
+                     , ramF :: NonEmpty [Frame 'Ram] -- RAM frames
+                     , swapFreeOffs :: [Offset (Frame 'Swap)]
+                     , swapF :: NonEmpty [Frame 'Swap] -- SWAP frames
                      }
 
 class Frames a where
@@ -33,7 +33,7 @@ readFrame' (Frame _ mem') (Offset off) co = do
  let (r, _) = splitAt co m
  return (r)
 
-instance Frames RAM where
+instance Frames 'Ram where
   getFreeFrameOffset = do
     (FT rfo ram sfo swap') <- get
     case rfo of
@@ -61,7 +61,7 @@ instance Frames RAM where
 
   readFrame = readFrame'
 
-instance Frames SWAP where
+instance Frames 'Swap where
   getFreeFrameOffset = do
     (FT rfo ram sfo swap') <- get
     case sfo of

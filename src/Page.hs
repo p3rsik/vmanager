@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-
 module Page
   ( PageTable
   , Page (..)
@@ -9,7 +7,7 @@ import Foundation
 
 import Types
 
-data Page a = Page
+data Page (a :: MemType) = Page
             { frId :: FrameId
             , age :: Age -- internal age of page, used in alg
             , memType :: MemType
@@ -18,4 +16,4 @@ data Page a = Page
             , pId :: ProcessId
             } deriving (Eq, Show)
 
-type PageTable = ([Page RAM], [Page SWAP])
+type PageTable = ([Page 'Ram], [Page 'Swap])
