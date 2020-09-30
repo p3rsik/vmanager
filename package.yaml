@@ -22,6 +22,7 @@ description:         Please see the README on GitHub at <https://github.com/p3rs
 dependencies:
 - base >= 4.7 && < 5
 - foundation
+- basement
 - fused-effects
 - ghc-prim
 - QuickCheck >= 2.13
@@ -33,6 +34,10 @@ library:
   default-extensions:
     - OverloadedStrings
     - NoImplicitPrelude
+    - DataKinds
+    - KindSignatures
+    - NamedFieldPuns
+    - TypeApplications
 
 executables:
   vmanager-exe:

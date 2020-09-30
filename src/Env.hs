@@ -5,9 +5,9 @@ module Env
 import Foundation
 
 import Frame (Frame)
-import Types (RAM, SWAP)
+import Types
 
 data Env = Env { memSize :: CountOf Word8
-               , ramSize :: CountOf (Frame RAM)
-               , swapSize :: CountOf (Frame SWAP)
+               , ramSize :: CountOf (Frame 'Ram)
+               , swapSize :: CountOf (Frame 'Swap)
                }

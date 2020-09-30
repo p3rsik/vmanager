@@ -34,11 +34,11 @@ library
       Paths_vmanager
   hs-source-dirs:
       src
-  default-extensions: OverloadedStrings NoImplicitPrelude
+  default-extensions: OverloadedStrings NoImplicitPrelude DataKinds KindSignatures NamedFieldPuns TypeApplications
   ghc-options: -Wall
   build-depends:
-      QuickCheck >=2.13
-    , base >=4.7 && <5
+      base >=4.7 && <5
+    , basement
     , foundation
     , fused-effects
     , ghc-prim
@@ -53,8 +53,8 @@ executable vmanager-exe
   default-extensions: OverloadedStrings NoImplicitPrelude
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:
-      QuickCheck >=2.13
-    , base >=4.7 && <5
+      base >=4.7 && <5
+    , basement
     , foundation
     , fused-effects
     , ghc-prim
@@ -73,6 +73,7 @@ test-suite vmanager-test
   build-depends:
       QuickCheck >=2.13
     , base >=4.7 && <5
+    , basement
     , foundation
     , fused-effects
     , ghc-prim

@@ -1,8 +1,5 @@
-{-# LANGUAGE EmptyDataDecls #-}
-
 module Types 
-  ( RAM
-  , SWAP
+  ( MemType (..)
   , ProcessId (..)
   , Age (..)
   , FrameId (..)
@@ -22,6 +19,5 @@ idToOff = Offset . fromIntegral . unFid
 
 offToId :: Offset a -> FrameId
 offToId (Offset i) = Fid $ fromIntegral i
-             
-data RAM
-data SWAP
+
+data MemType = Ram | Swap deriving (Show, Eq, Ord)
