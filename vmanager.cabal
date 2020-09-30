@@ -37,7 +37,8 @@ library
   default-extensions: OverloadedStrings NoImplicitPrelude
   ghc-options: -Wall
   build-depends:
-      base >=4.7 && <5
+      QuickCheck >=2.13
+    , base >=4.7 && <5
     , foundation
     , fused-effects
     , ghc-prim
@@ -52,7 +53,8 @@ executable vmanager-exe
   default-extensions: OverloadedStrings NoImplicitPrelude
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:
-      base >=4.7 && <5
+      QuickCheck >=2.13
+    , base >=4.7 && <5
     , foundation
     , fused-effects
     , ghc-prim
@@ -61,14 +63,16 @@ executable vmanager-exe
 
 test-suite vmanager-test
   type: exitcode-stdio-1.0
-  main-is: Spec.hs
+  main-is: PageTest.hs
   other-modules:
       Paths_vmanager
   hs-source-dirs:
-      test
+      tests
+  default-extensions: OverloadedStrings NoImplicitPrelude
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      QuickCheck >=2.13
+    , base >=4.7 && <5
     , foundation
     , fused-effects
     , ghc-prim
