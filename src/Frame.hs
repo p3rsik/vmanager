@@ -7,7 +7,8 @@ module Frame
   , setRamFrameFree
   , getFreeSwapFrameOffset
   , setSwapFrameFree
-  , writeFrame
+  , writeRamFrame
+  , writeSwapFrame
   , readFrame
   ) where
 
@@ -30,10 +31,10 @@ data FrameTable = FT { ramFreeOffs :: [Offset (Frame RAM)]
 -- If exists, return free ram page offset
 getFreeRamFrameOffset :: Has (State FrameTable) sig m => m (Maybe (Offset (Frame RAM)))
 getFreeRamFrameOffset = do
-  (FT rfo ram sfo swap) <- get
+  (FT rfo ram sfo swap') <- get
   case rfo of
     (x:xs) -> do
-      put (FT xs ram sfo swap)
+      put (FT xs ram sfo swap')
       return (Just x)
     [] -> return Nothing
 
@@ -44,10 +45,10 @@ setRamFrameFree offset = do
 -- If exists, return free swap page offset
 getFreeSwapFrameOffset :: Has (State FrameTable) sig m => m (Maybe (Offset (Frame SWAP)))
 getFreeSwapFrameOffset = do
-  (FT rfo ram sfo swap) <- get
+  (FT rfo ram sfo swap') <- get
   case sfo of
     (x:xs) -> do
-      put (FT rfo ram xs swap)
+      put (FT rfo ram xs swap')
       return (Just x)
     [] -> return Nothing
 
@@ -55,16 +56,24 @@ setSwapFrameFree :: Has (State FrameTable) sig m => Offset (Frame SWAP) -> m ()
 setSwapFrameFree offset = do
   modify (\(FT xs ram ys sw) -> FT xs ram (offset:ys) sw)
 
-writeFrame :: Has (State FrameTable) sig m => Frame RAM -> Offset (Frame RAM) -> [Word8] -> m ()
-writeFrame f@(Frame i mem') (Offset off) tw = do
+writeRamFrame :: Has (State FrameTable) sig m => Frame RAM -> Offset (Frame RAM) -> [Word8] -> m ()
+writeRamFrame f@(Frame i mem') (Offset off) tw = do
   let (s, _) = splitAt (toCount off) mem'
   let (_, e) = splitAt (toCount off + length tw) mem'
   let nf = Frame i (s <> tw <> e)
   let replace = nonEmptyFmap (\f' -> if f == f' then nf else f')
-  modify $ \(FT rfo ram sfo swap) -> FT rfo (replace ram) sfo swap
+  modify $ \(FT rfo ram sfo swap') -> FT rfo (replace ram) sfo swap'
 
-readFrame :: Has (State FrameTable) sig m => Frame RAM -> Offset (Frame RAM) -> CountOf Word8 -> m ([Word8])
-readFrame f@(Frame _ mem') (Offset off) co = do
+writeSwapFrame :: Has (State FrameTable) sig m => Frame SWAP -> Offset (Frame SWAP) -> [Word8] -> m ()
+writeSwapFrame f@(Frame i mem') (Offset off) tw = do
+  let (s, _) = splitAt (toCount off) mem'
+  let (_, e) = splitAt (toCount off + length tw) mem'
+  let nf = Frame i (s <> tw <> e)
+  let replace = nonEmptyFmap (\f' -> if f == f' then nf else f')
+  modify $ \(FT rfo ram sfo swap') -> FT rfo ram sfo $ replace swap'
+
+readFrame :: Has (State FrameTable) sig m => Frame a -> Offset (Frame a) -> CountOf Word8 -> m ([Word8])
+readFrame (Frame _ mem') (Offset off) co = do
   let (_, m) = splitAt (toCount off) mem'
   let (r, _) = splitAt co m
   return (r)
