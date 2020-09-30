@@ -15,21 +15,25 @@ import Data.Bits
 import GHC.Types
 
 import Foundation
+import Foundation.Collection
 import Control.Effect.State
 import Control.Effect.Catch
 import Control.Effect.Throw
-import Control.Monad
-import Foundation.Collection
+import Control.Effect.Reader
 
 import Frame
+import Env
 import Page
+import Types
 
 data ManagerError = CantCreatePage 
-                  | NoFreeSwapFrame
-                  | FuckYou
+                  | NoFreeSwapFrames
+                  | FuckYou 
+                  deriving (Eq, Ord)
 
 type Manager sig m = (Has (State FrameTable) sig m,
                       Has (State PageTable) sig m,
+                      Has (Reader Env) sig m,
                       Has (Throw ManagerError) sig m,
                       Has (Catch ManagerError) sig m)
 
@@ -41,15 +45,8 @@ createPage pid = undefined
 deletePage :: Manager sig m => Page a -> m ()
 deletePage p = undefined
 
--- unsafe 
-getEl :: Offset a -> [a] -> a
-getEl (Offset i) xs = go xs i where
-  go :: [a] -> Int -> a
-  go (_:xs) !i = go xs (i - 1)
-  go (x:_) 0 = x
-  go _ _ = undefined
-
--- Dangeros function, can be used only if ram pages are not empty
+-- Used only in situation, where no free Ram pages exists
+-- which means, that ram array is not empty
 findPageToUnload :: Manager sig m => m (Page RAM)
 findPageToUnload = do
   (ram, _) <- get @PageTable
@@ -63,20 +60,40 @@ loadPage p@(Page {frId, pId}) = do
   case offM of
     -- If there is a free RAM page, use it
     Just off -> do 
-      (FT _ ram _ _) <- get @FrameTable
-
-      -- get frameId corresponding to the free frame
-      let fId = offToId off
-      -- replace existing page with new page corresponding to the found Frame
-      modify @PageTable $ bimap ((Page fId (Age 100) False False pId):) 
-                                (filter (/=p))
-
-      -- get offset corresponding to the swap frame that need to be freed
+      -- get offset corresponding to the swap frame that needs to be freed
       let swapOff = idToOff frId
       -- Free SWAP Frame
       setSwapFrameFree swapOff
+
+      env <- ask @Env
+      -- get frameId corresponding to the free frame
+      let fId = offToId off
+      let np = Page fId (Age 100) False False pId
+
+      -- save memory
+      copyMem p np
+
+      -- replace existing page with new page corresponding to the found Frame
+      modify @PageTable $ bimap (np:) (filter (/= p))
+
     -- If there is no free RAM page available, then find one, that can be unloaded
-    Nothing -> throwError FuckYou
+    Nothing -> do
+      -- fId - Ram frame id(and offset) that would be free after page unloading
+      pu@(Page {frId = fId}) <- findPageToUnload
+      -- mark Swap Frame that we're unloading from as free
+      setSwapFrameFree $ idToOff frId
+      -- if there are no free swap frames, this ^ can give us one frame that we need
+      unloadPage pu
+      let np = Page fId (Age 100) False False pId
+      copyMem p np
+      modify @PageTable $ first (np:)
+
+-- Copy memory from one page to another
+copyMem :: Manager sig m => Page a -> Page b -> m ()
+copyMem f t = do
+  env <- ask @Env
+  mem <- readPage f (Offset 0) $ memSize env
+  writePage t (Offset 0) mem
 
 -- Unload page from RAM to SWAP
 unloadPage :: Manager sig m => Page RAM -> m ()
@@ -84,13 +101,18 @@ unloadPage p@(Page {frId, pId}) = do
   offM <- getFreeSwapFrameOffset
   case offM of
     Just off -> do
-      mem <- readPage p (Offset 0) (CountOf 1024)
+      env <- ask @Env
       setRamFrameFree $ idToOff frId
       let np = Page (offToId off) (Age 100) False False pId
-      writePage np 0 mem
-      modify @PageTable $ bimap (filter (/= p))
-                                (np:)
-    Nothing -> throwError NoFreeSwapFrame
+
+      -- save memory
+      copyMem p np
+
+      -- delete current page from RAM pages and add new page to the SWAP pages
+      modify @PageTable $ bimap (filter (/= p)) (np:)
+
+    -- if no free Swap frames exists -> throw error
+    Nothing -> throwError NoFreeSwapFrames
 
 -- Write memory to the page
 writePage :: Manager sig m => Page a -> Offset Word8 -> [Word8] -> m ()

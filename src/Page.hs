@@ -1,32 +1,15 @@
-{-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Page
   ( PageTable
-  , ProcessId (..)
-  , Age (..)
-  , FrameId (..)
   , Page (..)
-  , RAM
-  , SWAP
-  , idToOff
-  , offToId
   ) where 
 
 import Foundation
+import Control.Effect.State
 
-newtype ProcessId = Pid { unPid :: Int } deriving (Show, Eq, Ord)
-newtype Age = Age { unAge :: Word } deriving (Show, Eq, Ord)
--- FrameId is also a Frame offset
-newtype FrameId = Fid { unFid :: Word } deriving (Show, Eq, Ord)
-
-idToOff :: FrameId -> Offset a
-idToOff = Offset . fromIntegral . unFid
-
-offToId :: Offset a -> FrameId
-offToId (Offset i) = Fid $ fromIntegral i
-             
-data RAM
-data SWAP
+import Types
+import Frame (Frame)
 
 data Page a = Page
             { frId :: FrameId

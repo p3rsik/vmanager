@@ -29,6 +29,7 @@ library
       Frame
       Manager
       Page
+      Types
   other-modules:
       Paths_vmanager
   hs-source-dirs:

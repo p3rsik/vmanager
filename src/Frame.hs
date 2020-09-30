@@ -9,7 +9,7 @@ module Frame
 
 import Foundation
 import Control.Effect.State
-import Page
+import Types
 
 data Frame a = Frame
              { frameId :: FrameId -- Actually, FrameId is also Frame offset
