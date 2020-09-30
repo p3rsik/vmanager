@@ -2,7 +2,6 @@
 module Main where
 
 import Test.QuickCheck
-import Test.QuickCheck.All
 import Foundation
 
 import Page
@@ -17,9 +16,9 @@ qsort (x:xs) = qsort lhs <> [x] <> qsort rhs
 
 -- page table with random values for testing
 pTable :: PageTable
-pTable = ([(Page (Fid fid) (Age 1) False False (Pid pid)) | fid <- [1..128],
+pTable = ([(Page (Fid fid) (Age 1) Ram False False (Pid pid)) | fid <- [1..128],
                                              pid <- [1..128]],
-          [(Page (Fid fid) (Age 1) False False (Pid pid)) | fid <- [1..128],
+          [(Page (Fid fid) (Age 1) Swap False False (Pid pid)) | fid <- [1..128],
                                              pid <- [1..128]])
 
 idToOffTest :: Property

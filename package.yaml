@@ -25,7 +25,6 @@ dependencies:
 - basement
 - fused-effects
 - ghc-prim
-- QuickCheck >= 2.13
 
 library:
   source-dirs: src
