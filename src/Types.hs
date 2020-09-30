@@ -3,6 +3,7 @@
 module Types 
   ( RAM
   , SWAP
+  , MemType (..)
   , ProcessId (..)
   , Age (..)
   , FrameId (..)
@@ -25,3 +26,5 @@ offToId (Offset i) = Fid $ fromIntegral i
              
 data RAM
 data SWAP
+
+data MemType = Ram | Swap deriving (Show, Eq, Ord)

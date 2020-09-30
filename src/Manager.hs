@@ -4,7 +4,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE BangPatterns #-}
 
 module Manager
   ( createPage
@@ -61,18 +60,18 @@ findPageToUnload = do
 loadPage :: Manager sig m => Page SWAP -> m ()
 loadPage p@(Page {frId, pId}) = do
   -- Get free RAM Frame
-  offM <- getFreeRamFrameOffset
+  offM <- getFreeFrameOffset @RAM
   case offM of
     -- If there is a free RAM page, use it
     Just off -> do 
       -- get offset corresponding to the swap frame that needs to be freed
       let swapOff = idToOff frId
       -- Free SWAP Frame
-      setSwapFrameFree swapOff
+      setFrameFree @SWAP swapOff
 
       -- get frameId corresponding to the free frame
       let fId = offToId off
-      let np = Page fId (Age 100) False False pId
+      let np = Page fId (Age 100) Ram False False pId
 
       -- save memory
       copyMem p np
@@ -85,10 +84,10 @@ loadPage p@(Page {frId, pId}) = do
       -- fId - Ram frame id(and offset) that would be free after page unloading
       pu@(Page {frId = fId}) <- findPageToUnload
       -- mark Swap Frame that we're unloading from as free
-      setSwapFrameFree $ idToOff frId
+      setFrameFree @SWAP $ idToOff frId
       -- if there are no free swap frames, this ^ can give us one frame that we need
       unloadPage pu
-      let np = Page fId (Age 100) False False pId
+      let np = Page fId (Age 100) Ram False False pId
       copyMem p np
       modify @PageTable $ first (np:)
 
@@ -102,11 +101,11 @@ copyMem f t = do
 -- Unload page from RAM to SWAP
 unloadPage :: Manager sig m => Page RAM -> m ()
 unloadPage p@(Page {frId, pId}) = do
-  offM <- getFreeSwapFrameOffset
+  offM <- getFreeFrameOffset @SWAP
   case offM of
     Just off -> do
-      setRamFrameFree $ idToOff frId
-      let np = Page (offToId off) (Age 100) False False pId
+      setFrameFree @RAM $ idToOff frId
+      let np = Page (offToId off) (Age 100) Swap False False pId
 
       -- save memory
       copyMem p np
@@ -119,8 +118,14 @@ unloadPage p@(Page {frId, pId}) = do
 
 -- Write memory to the page
 writePage :: Manager sig m => Page a -> Offset Word8 -> [Word8] -> m ()
-writePage p off mem = do
-  return ()
+writePage (Page { frId, memType }) off mem = do
+  case memType of
+    Ram -> do
+      f <- getFrame @RAM frId
+      writeFrame f off mem
+    Swap -> do
+      f <- getFrame @SWAP frId
+      writeFrame f off mem
 
 -- Read memory from the page
 readPage :: Manager sig m => Page a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
