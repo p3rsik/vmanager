@@ -7,7 +7,12 @@
 {-# LANGUAGE BangPatterns #-}
 
 module Manager
-  (
+  ( createPage
+  , deletePage
+  , loadPage
+  , unloadPage
+  , writePage
+  , readPage
   )
 where
 
@@ -65,7 +70,6 @@ loadPage p@(Page {frId, pId}) = do
       -- Free SWAP Frame
       setSwapFrameFree swapOff
 
-      env <- ask @Env
       -- get frameId corresponding to the free frame
       let fId = offToId off
       let np = Page fId (Age 100) False False pId
@@ -101,7 +105,6 @@ unloadPage p@(Page {frId, pId}) = do
   offM <- getFreeSwapFrameOffset
   case offM of
     Just off -> do
-      env <- ask @Env
       setRamFrameFree $ idToOff frId
       let np = Page (offToId off) (Age 100) False False pId
 
@@ -116,7 +119,8 @@ unloadPage p@(Page {frId, pId}) = do
 
 -- Write memory to the page
 writePage :: Manager sig m => Page a -> Offset Word8 -> [Word8] -> m ()
-writePage p off mem = undefined
+writePage p off mem = do
+  return ()
 
 -- Read memory from the page
 readPage :: Manager sig m => Page a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
@@ -145,24 +149,6 @@ readPage p off count = undefined
   -- env <- ask
   -- modifyPT env $ filter (/= page)
   -- modifyFT env (\(FrameTable xs fs ys zs) -> FrameTable (Page.frameId page : xs) fs ys zs)
-
-
--- -- Unload page from RAM to SWAP
--- unloadPage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
--- unloadPage page@(Page _ c _ w r pid) = do
-  -- unless (inRam page) . throwError $ "Trying to unload page that is not in RAM" <> show page
-  -- env <- ask
-  -- ft <- getFrameTable env
-  -- let ind = Page.frameId page
-  -- let (t, nfi) = case getFreeSwapPage ft of
-        -- Just x -> (True, x)
-        -- Nothing -> (False, 0)
-  -- unless t . throwError $ "Can't unload " <> show page <> ": Not enough memory in SWAP"
-
-  -- modifyFT env (\(FrameTable xs ys fs zs) -> FrameTable (ind : xs) ys fs zs)
-  -- modifyFT env popFreeSwapPage
-
-  -- modifyPT env $ fmap (\p -> if page == p then Page nfi c False w r pid else p)
 
 -- writePage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
 -- writePage page@(Page fi c ir _ r pid) = do

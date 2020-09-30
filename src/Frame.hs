@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeApplications #-}
+
 module Frame
   ( FrameTable (..)
   , Frame (..)
@@ -5,9 +7,12 @@ module Frame
   , setRamFrameFree
   , getFreeSwapFrameOffset
   , setSwapFrameFree
+  , writeFrame
+  , readFrame
   ) where
 
 import Foundation
+import Foundation.Collection
 import Control.Effect.State
 import Types
 
@@ -17,9 +22,9 @@ data Frame a = Frame
              } deriving (Show, Eq)
 
 data FrameTable = FT { ramFreeOffs :: [Offset (Frame RAM)]
-                     , ramF :: [Frame RAM] -- RAM frames
+                     , ramF :: NonEmpty [Frame RAM] -- RAM frames
                      , swapFreeOffs :: [Offset (Frame SWAP)]
-                     , swapF :: [Frame SWAP] -- SWAP frames
+                     , swapF :: NonEmpty [Frame SWAP] -- SWAP frames
                      }
 
 -- If exists, return free ram page offset
@@ -49,3 +54,17 @@ getFreeSwapFrameOffset = do
 setSwapFrameFree :: Has (State FrameTable) sig m => Offset (Frame SWAP) -> m ()
 setSwapFrameFree offset = do
   modify (\(FT xs ram ys sw) -> FT xs ram (offset:ys) sw)
+
+writeFrame :: Has (State FrameTable) sig m => Frame RAM -> Offset (Frame RAM) -> [Word8] -> m ()
+writeFrame f@(Frame i mem') (Offset off) tw = do
+  let (s, _) = splitAt (toCount off) mem'
+  let (_, e) = splitAt (toCount off + length tw) mem'
+  let nf = Frame i (s <> tw <> e)
+  let replace = nonEmptyFmap (\f' -> if f == f' then nf else f')
+  modify $ \(FT rfo ram sfo swap) -> FT rfo (replace ram) sfo swap
+
+readFrame :: Has (State FrameTable) sig m => Frame RAM -> Offset (Frame RAM) -> CountOf Word8 -> m ([Word8])
+readFrame f@(Frame _ mem') (Offset off) co = do
+  let (_, m) = splitAt (toCount off) mem'
+  let (r, _) = splitAt co m
+  return (r)
