@@ -22,7 +22,8 @@ description:         Please see the README on GitHub at <https://github.com/p3rs
 dependencies:
 - base >= 4.7 && < 5
 - foundation
-- mtl >= 2.2.2
+- fused-effects
+- ghc-prim
 
 library:
   source-dirs: src

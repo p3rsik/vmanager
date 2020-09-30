@@ -1,41 +1,51 @@
 module Frame
   ( FrameTable (..)
   , Frame (..)
-  , popFreeRamPage
-  , popFreeSwapPage
-  , getFreeRamPage
-  , getFreeSwapPage
+  , getFreeRamFrameOffset
+  , setRamFrameFree
+  , getFreeSwapFrameOffset
+  , setSwapFrameFree
   ) where
 
 import Foundation
+import Control.Effect.State
+import Page
 
-data Frame = Frame
-             { frameId :: Word
+data Frame a = Frame
+             { frameId :: FrameId -- Actually, FrameId is also Frame offset
              , mem :: [Word8]
              } deriving (Show, Eq)
 
-data FrameTable = FrameTable [Word] [Frame] [Word] [Frame]
--- [Word] - array with offsets of free Frames in RAM
--- [Frame] - RAM frames
--- [Word](snd) - array with offsets of free Frames in SWAP
--- [Frame](snd) - SWAP frames
+data FrameTable = FT { ramFreeOffs :: [Offset (Frame RAM)]
+                     , ramF :: [Frame RAM] -- RAM frames
+                     , swapFreeOffs :: [Offset (Frame SWAP)]
+                     , swapF :: [Frame SWAP] -- SWAP frames
+                     }
 
--- pop physical page making it not-free
-popFreeRamPage :: FrameTable -> FrameTable
-popFreeRamPage (FrameTable (_:xs) y z zs) = FrameTable xs y z zs
-popFreeRamPage (FrameTable [] y z zs) = FrameTable [] y z zs
+-- If exists, return free ram page offset
+getFreeRamFrameOffset :: Has (State FrameTable) sig m => m (Maybe (Offset (Frame RAM)))
+getFreeRamFrameOffset = do
+  (FT rfo ram sfo swap) <- get
+  case rfo of
+    (x:xs) -> do
+      put (FT xs ram sfo swap)
+      return (Just x)
+    [] -> return Nothing
 
--- get free physical page
-getFreeRamPage :: FrameTable -> Maybe Word
-getFreeRamPage (FrameTable (x:_) _ _ _) = Just x
-getFreeRamPage (FrameTable [] _ _ _) = Nothing
+setRamFrameFree :: Has (State FrameTable) sig m => Offset (Frame RAM) -> m ()
+setRamFrameFree offset = do
+  modify (\(FT xs ram ys sw) -> FT (offset:xs) ram ys sw)
 
--- pop physical page making it not-free
-popFreeSwapPage :: FrameTable -> FrameTable
-popFreeSwapPage (FrameTable xs y (_:z) zs) = FrameTable xs y z zs
-popFreeSwapPage (FrameTable xs y [] zs) = FrameTable xs y [] zs
+-- If exists, return free swap page offset
+getFreeSwapFrameOffset :: Has (State FrameTable) sig m => m (Maybe (Offset (Frame SWAP)))
+getFreeSwapFrameOffset = do
+  (FT rfo ram sfo swap) <- get
+  case sfo of
+    (x:xs) -> do
+      put (FT rfo ram xs swap)
+      return (Just x)
+    [] -> return Nothing
 
--- get free physical page
-getFreeSwapPage :: FrameTable -> Maybe Word
-getFreeSwapPage (FrameTable _ _ (x:_) _) = Just x
-getFreeSwapPage (FrameTable _ _ [] _) = Nothing
+setSwapFrameFree :: Has (State FrameTable) sig m => Offset (Frame SWAP) -> m ()
+setSwapFrameFree offset = do
+  modify (\(FT xs ram ys sw) -> FT xs ram (offset:ys) sw)

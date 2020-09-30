@@ -1,130 +1,170 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE BangPatterns #-}
 
 module Manager
-    ( 
-    ) where
+  (
+  )
+where
+
+import Data.Bits
+import GHC.Types
 
 import Foundation
-import Control.Monad.Reader
-import Control.Monad.Except
-import Data.IORef
-import Data.Bits
+import Control.Effect.State
+import Control.Effect.Catch
+import Control.Effect.Throw
+import Control.Monad
+import Foundation.Collection
 
-import Page
 import Frame
+import Page
 
-data Env = Env
-           { pageTable :: IORef PageTable
-           , frameTable :: IORef FrameTable
-           }
+data ManagerError = CantCreatePage 
+                  | NoFreeSwapFrame
+                  | FuckYou
 
--- TODO:
--- Add custom error type
--- Implement load page
+type Manager sig m = (Has (State FrameTable) sig m,
+                      Has (State PageTable) sig m,
+                      Has (Throw ManagerError) sig m,
+                      Has (Catch ManagerError) sig m)
 
-modifyPT :: (MonadError String m, MonadReader Env m, MonadIO m) => Env -> (PageTable -> PageTable) -> m ()
-modifyPT env action = liftIO $ modifyIORef' (pageTable env) action
-
-modifyFT :: (MonadError String m, MonadReader Env m, MonadIO m) => Env -> (FrameTable -> FrameTable) -> m ()
-modifyFT env action = liftIO $ modifyIORef' (frameTable env) action
-
-getPageTable :: (MonadError String m, MonadReader Env m, MonadIO m) => Env -> m PageTable
-getPageTable env = liftIO . readIORef $ pageTable env
-
-getFrameTable :: (MonadError String m, MonadReader Env m, MonadIO m) => Env -> m FrameTable
-getFrameTable env = liftIO . readIORef $ frameTable env
-
--- Find free frame in RAM(if available), if not, unload frame from RAM to SWAP and use it
-createPage :: (MonadError String m, MonadReader Env m, MonadIO m) => ProcessId -> m ()
-createPage pid = do
-  env <- ask
-  pt <- getPageTable env
-  ft <- getFrameTable env
-  -- setting page counter(age) to 100 so it won't go into SWAP right after creation
-  let (t, ni) = case getFreeRamPage ft of
-                  Just x -> (True, x)
-                  Nothing -> (False, 0)
-  unless t $ do
-    let pu = foldl' (\acc el -> if pcounter acc < pcounter el then acc else el) (Page 0 0 (maxBound :: Word) False False False 0) pt
-    unloadPage pu `catchError` (\_ -> throwError "Can't create page")
-
-  let np = Page ni (fromIntegral . fromCount $ length pt) 100 True False False pid
-  modifyFT env popFreeRamPage
-  modifyPT env $ const (np:pt)
+-- Find free RAM frame (if available), if not, unload frame from RAM to SWAP and use it
+createPage :: Manager sig m => ProcessId -> m (Maybe (Page RAM))
+createPage pid = undefined
 
 -- Find corresponding frame and mark it free, then delete page from pool of pages
-deletePage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
-deletePage page = do
-  env <- ask
-  modifyPT env $ filter (/= page)
-  modifyFT env (\(FrameTable xs fs ys zs) -> FrameTable (Page.frameId page:xs) fs ys zs)
+deletePage :: Manager sig m => Page a -> m ()
+deletePage p = undefined
+
+-- unsafe 
+getEl :: Offset a -> [a] -> a
+getEl (Offset i) xs = go xs i where
+  go :: [a] -> Int -> a
+  go (_:xs) !i = go xs (i - 1)
+  go (x:_) 0 = x
+  go _ _ = undefined
+
+-- Dangeros function, can be used only if ram pages are not empty
+findPageToUnload :: Manager sig m => m (Page RAM)
+findPageToUnload = do
+  (ram, _) <- get @PageTable
+  return . foldl1' (\acc el -> if age el < age acc then el else acc) $ nonEmpty_ ram
 
 -- Load page from SWAP to RAM
-loadPage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
-loadPage page@(Page _ po c _ w r pid) = do
-  when (inRam page) . throwError $ "Trying to load page that is already in RAM" <> show page
-  env <- ask
-  ft <- getFrameTable env
-  pt <- getPageTable env
-  let ind = Page.frameId page
-  let (t, nfid) = case getFreeRamPage ft of
-                   Just x -> (True, x)
-                   Nothing -> (False, 0)
-  when t $ do
-    modifyFT env popFreeRamPage
-    modifyPT env $ fmap (\p -> if page == p then Page nfid po c True w r pid else p)
-    modifyFT env (\(FrameTable xs ys zs ls) -> FrameTable xs ys (ind:zs) ls)
+loadPage :: Manager sig m => Page SWAP -> m ()
+loadPage p@(Page {frId, pId}) = do
+  -- Get free RAM Frame
+  offM <- getFreeRamFrameOffset
+  case offM of
+    -- If there is a free RAM page, use it
+    Just off -> do 
+      (FT _ ram _ _) <- get @FrameTable
 
-  let pu = foldl' (\acc el -> if pcounter acc < pcounter el then acc else el) (Page 0 0 (maxBound :: Word) False False False 0) pt
-  unloadPage pu `catchError` (\_ -> throwError $ "Can't unload page " <> show pu)
-  let (t, nfid) = case getFreeRamPage ft of
-                   Just x -> (True, x)
-                   Nothing -> (False, 0)
-  when t $ do
-    modifyFT env popFreeRamPage
-    modifyPT env $ fmap (\p -> if page == p then Page nfid po c True w r pid else p)
-    modifyFT env (\(FrameTable xs ys zs ls) -> FrameTable xs ys (ind:zs) ls)
-  throwError $ "Can't load page " <> show page
-  
+      -- get frameId corresponding to the free frame
+      let fId = offToId off
+      -- replace existing page with new page corresponding to the found Frame
+      modify @PageTable $ bimap ((Page fId (Age 100) False False pId):) 
+                                (filter (/=p))
+
+      -- get offset corresponding to the swap frame that need to be freed
+      let swapOff = idToOff frId
+      -- Free SWAP Frame
+      setSwapFrameFree swapOff
+    -- If there is no free RAM page available, then find one, that can be unloaded
+    Nothing -> throwError FuckYou
 
 -- Unload page from RAM to SWAP
-unloadPage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
-unloadPage page@(Page _ po c _ w r pid) = do
-  unless (inRam page) . throwError $ "Trying to unload page that is not in RAM" <> show page
-  env <- ask
-  ft <- getFrameTable env
-  let ind = Page.frameId page
-  let (t, nfi) = case getFreeSwapPage ft of
-                   Just x -> (True, x)
-                   Nothing -> (False, 0)
-  unless t . throwError $ "Can't unload " <> show page <> ": Not enough memory in SWAP"
+unloadPage :: Manager sig m => Page RAM -> m ()
+unloadPage p@(Page {frId, pId}) = do
+  offM <- getFreeSwapFrameOffset
+  case offM of
+    Just off -> do
+      mem <- readPage p (Offset 0) (CountOf 1024)
+      setRamFrameFree $ idToOff frId
+      let np = Page (offToId off) (Age 100) False False pId
+      writePage np 0 mem
+      modify @PageTable $ bimap (filter (/= p))
+                                (np:)
+    Nothing -> throwError NoFreeSwapFrame
 
-  modifyFT env (\(FrameTable xs ys fs zs) -> FrameTable (ind:xs) ys fs zs)
-  modifyFT env popFreeSwapPage
+-- Write memory to the page
+writePage :: Manager sig m => Page a -> Offset Word8 -> [Word8] -> m ()
+writePage p off mem = undefined
 
-  modifyPT env $ fmap (\p -> if page == p then Page nfi po c False w r pid else p)
+-- Read memory from the page
+readPage :: Manager sig m => Page a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
+readPage p off count = undefined
 
-writePage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
-writePage page@(Page fi po c ir _ r pid) = do
-  env <- ask
-  modifyPT env $ fmap (\p -> if page == p then Page fi po c ir True r pid else p)
-  ageWorld
-  modifyPT env $ fmap (\p -> if page == p then Page fi po c ir False r pid else p)
 
-ageWorld :: (MonadError String m, MonadReader Env m, MonadIO m) => m ()
-ageWorld = do
-  env <- ask
-  liftIO . modifyIORef' (pageTable env) $ fmap agePage
-  where
-    agePage :: Page -> Page
-    agePage (Page fi po c ir w r pid) = let c' = if r
-                                                 then setBit (shiftR c 1) (finiteBitSize c - 1)
-                                                 else shiftR c 1 in
-      Page fi po c' ir w r pid
+-- createPage :: (MonadError String m, MonadReader Env m, MonadIO m) => ProcessId -> m ()
+-- createPage pid = do
+  -- env <- ask
+  -- pt <- getPageTable env
+  -- ft <- getFrameTable env
+  -- -- setting page counter(age) to 100 so it won't go into SWAP right after creation
+  -- let (t, ni) = case getFreeRamPage ft of
+        -- Just x -> (True, x)
+        -- Nothing -> (False, 0)
+  -- unless t $ do
+    -- let pu = foldl' (\acc el -> if pcounter acc < pcounter el then acc else el) (Page 0 (maxBound :: Word) False False False 0) pt
+    -- unloadPage pu `catchError` (\_ -> throwError "Can't create page")
 
-readPage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
-readPage page@(Page fi po c ir w _ pid) = do
-  env <- ask
-  modifyPT env $ fmap (\p -> if page == p then Page fi po c ir w True pid else p)
-  ageWorld
-  modifyPT env $ fmap (\p -> if page == p then Page fi po c ir w False pid else p)
+  -- let np = Page ni 100 True False False pid
+  -- modifyFT env popFreeRamPage
+  -- modifyPT env $ const (np : pt)
+
+-- deletePage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
+-- deletePage page = do
+  -- env <- ask
+  -- modifyPT env $ filter (/= page)
+  -- modifyFT env (\(FrameTable xs fs ys zs) -> FrameTable (Page.frameId page : xs) fs ys zs)
+
+
+-- -- Unload page from RAM to SWAP
+-- unloadPage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
+-- unloadPage page@(Page _ c _ w r pid) = do
+  -- unless (inRam page) . throwError $ "Trying to unload page that is not in RAM" <> show page
+  -- env <- ask
+  -- ft <- getFrameTable env
+  -- let ind = Page.frameId page
+  -- let (t, nfi) = case getFreeSwapPage ft of
+        -- Just x -> (True, x)
+        -- Nothing -> (False, 0)
+  -- unless t . throwError $ "Can't unload " <> show page <> ": Not enough memory in SWAP"
+
+  -- modifyFT env (\(FrameTable xs ys fs zs) -> FrameTable (ind : xs) ys fs zs)
+  -- modifyFT env popFreeSwapPage
+
+  -- modifyPT env $ fmap (\p -> if page == p then Page nfi c False w r pid else p)
+
+-- writePage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
+-- writePage page@(Page fi c ir _ r pid) = do
+  -- env <- ask
+  -- modifyPT env $ fmap (\p -> if page == p then Page fi c ir True r pid else p)
+  -- ageWorld
+  -- modifyPT env $ fmap (\p -> if page == p then Page fi c ir False r pid else p)
+
+-- ageWorld :: (MonadError String m, MonadReader Env m, MonadIO m) => m ()
+-- ageWorld = do
+  -- env <- ask
+  -- liftIO . modifyIORef' (pageTable env) $ fmap agePage
+  -- where
+    -- agePage :: Page -> Page
+    -- agePage (Page fi c ir w r pid) =
+      -- let c' =
+            -- if r
+              -- then setBit (shiftR c 1) (finiteBitSize c - 1)
+              -- else shiftR c 1
+       -- in Page fi c' ir w r pid
+
+-- readPage :: (MonadError String m, MonadReader Env m, MonadIO m) => Page -> m ()
+-- readPage page@(Page fi c ir w _ pid) = do
+  -- env <- ask
+  -- modifyPT env $ fmap (\p -> if page == p then Page fi c ir w True pid else p)
+  -- ageWorld
+  -- modifyPT env $ fmap (\p -> if page == p then Page fi c ir w False pid else p)

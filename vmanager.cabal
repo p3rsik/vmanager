@@ -38,7 +38,8 @@ library
   build-depends:
       base >=4.7 && <5
     , foundation
-    , mtl >=2.2.2
+    , fused-effects
+    , ghc-prim
   default-language: Haskell2010
 
 executable vmanager-exe
@@ -52,7 +53,8 @@ executable vmanager-exe
   build-depends:
       base >=4.7 && <5
     , foundation
-    , mtl >=2.2.2
+    , fused-effects
+    , ghc-prim
     , vmanager
   default-language: Haskell2010
 
@@ -67,6 +69,7 @@ test-suite vmanager-test
   build-depends:
       base >=4.7 && <5
     , foundation
-    , mtl >=2.2.2
+    , fused-effects
+    , ghc-prim
     , vmanager
   default-language: Haskell2010
