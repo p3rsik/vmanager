@@ -13,7 +13,6 @@ import Manager.Types
 data Page (a :: MemType) = Page
             { frId :: FrameId a
             , age :: Age -- internal age of page, used in alg
-            , memType :: MemType
             , wBit :: Bool -- If some process is writing this page now, then no other process can write it
             , rBit :: Bool -- -//- (writing -> reading)
             , pId :: ProcessId
@@ -38,7 +37,7 @@ findPageToUnload = do
 
 instance Pages 'Ram where
   createPage fid pid = do
-    let np = Page fid (Age 100) Ram False False pid
+    let np = Page fid (Age 100) False False pid
     modify @PageTable $ first (np:)
     return np
 
@@ -56,7 +55,7 @@ instance Pages 'Ram where
 
 instance Pages 'Swap where
   createPage fid pid = do
-    let np = Page fid (Age 0) Swap False False pid
+    let np = Page fid (Age 0) False False pid
     modify @PageTable $ second (np:)
     return np
 

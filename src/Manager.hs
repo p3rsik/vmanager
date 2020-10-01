@@ -60,15 +60,10 @@ allocPage pid = do
 
 
 -- Find corresponding frame and mark it free, then delete page from pool of pages
-freePage :: ManagerSig sig m => Page a -> m ()
-freePage (Page { frId, age, memType, wBit, rBit, pId }) = do
-  case memType of
-    Ram -> do
-      let p = Page (Fid $ unFid frId) age memType wBit rBit pId
-      deletePage @'Ram p
-    Swap -> do
-      let p = Page (Fid $ unFid frId) age memType wBit rBit pId
-      deletePage @'Swap p
+freePage :: (Pages a, Frames a, ManagerSig sig m) => Page a -> m ()
+freePage p@(Page { frId }) = do
+  deletePage p
+  setFrameFree frId
 
 
 -- Load page from SWAP to RAM
@@ -102,7 +97,7 @@ moveToRam p@(Page { frId, pId }) = do
 
 
 -- Copy memory from one page to another
-copyMem :: ManagerSig sig m => Page a -> Page b -> m ()
+copyMem :: (Pages a, Frames a, Pages b, Frames b, ManagerSig sig m) => Page a -> Page b -> m ()
 copyMem f t = do
   env <- ask @Env
   mem <- readMem f (Offset 0) $ memSize env
@@ -130,28 +125,17 @@ moveToSwap p@(Page { frId, pId }) = do
 
 
 -- Write memory to the page
-writeMem :: ManagerSig sig m => Page a -> Offset Word8 -> [Word8] -> m ()
-writeMem (Page { frId, memType }) off mem = do
-  case memType of 
-    Ram -> do 
-      f <- getFrame @'Ram (Fid $ unFid frId)
-      writeFrame f off mem
-    Swap -> do
-      f <- getFrame @'Swap (Fid $ unFid frId)
-      writeFrame f off mem
+writeMem :: (Pages a, Frames a, ManagerSig sig m) => Page a -> Offset Word8 -> [Word8] -> m ()
+writeMem (Page { frId }) off mem = do
+  f <- getFrame frId
+  writeFrame f off mem
 
 
 -- Read memory from the page
-readMem :: ManagerSig sig m => Page a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
-readMem (Page { frId, memType }) off count = do
-  case memType of
-    Ram -> do
-      f <- getFrame @'Ram (Fid $ unFid frId)
-      readFrame f off count
-    Swap -> do
-      f <- getFrame @'Swap (Fid $ unFid frId)
-      readFrame f off count
-
+readMem :: (Pages a, Frames a, ManagerSig sig m) => Page a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
+readMem (Page { frId }) off count = do
+  f <- getFrame frId
+  readFrame f off count
 
 
 -- ageWorld :: (MonadError String m, MonadReader Env m, MonadIO m) => m ()
