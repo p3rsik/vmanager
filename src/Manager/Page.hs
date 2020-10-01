@@ -1,11 +1,10 @@
-module Page
+module Manager.Page
   ( PageTable
   , Page (..)
   ) where 
 
 import Foundation
-
-import Types
+import Manager.Types
 
 data Page (a :: MemType) = Page
             { frId :: FrameId

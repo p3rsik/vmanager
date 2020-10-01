@@ -1,11 +1,11 @@
-module Env
+module Manager.Env
   ( Env (..)
   ) where
 
 import Foundation
 
-import Frame (Frame)
-import Types
+import Manager.Frame (Frame)
+import Manager.Types
 
 data Env = Env { memSize :: CountOf Word8
                , ramSize :: CountOf (Frame 'Ram)

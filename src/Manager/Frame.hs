@@ -1,4 +1,4 @@
-module Frame
+module Manager.Frame
   ( FrameTable (..)
   , Frame (..)
   , Frames (..)
@@ -7,7 +7,7 @@ module Frame
 import Foundation
 import Foundation.Collection
 import Control.Effect.State
-import Types
+import Manager.Types
 
 data Frame (a :: MemType) = Frame
              { frameId :: FrameId -- Actually, FrameId is also Frame offset

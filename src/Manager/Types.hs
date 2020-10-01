@@ -1,4 +1,4 @@
-module Types 
+module Manager.Types 
   ( MemType (..)
   , ProcessId (..)
   , Age (..)
@@ -12,12 +12,12 @@ import Foundation
 newtype ProcessId = Pid { unPid :: Int } deriving (Show, Eq, Ord)
 newtype Age = Age { unAge :: Word } deriving (Show, Eq, Ord)
 -- FrameId is also a Frame offset
-newtype FrameId = Fid { unFid :: Word } deriving (Show, Eq, Ord)
+newtype FrameId = Fid { unFid :: Int } deriving (Show, Eq, Ord)
 
 idToOff :: FrameId -> Offset a
-idToOff = Offset . fromIntegral . unFid
+idToOff = Offset . unFid
 
 offToId :: Offset a -> FrameId
-offToId (Offset i) = Fid $ fromIntegral i
+offToId (Offset i) = Fid i
 
 data MemType = Ram | Swap deriving (Show, Eq, Ord)
