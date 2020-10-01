@@ -2,6 +2,8 @@ module Manager.Frame
   ( FrameTable (..)
   , Frame (..)
   , Frames (..)
+  , idToOff
+  , offToId
   ) where
 
 import Foundation
@@ -10,7 +12,7 @@ import Control.Effect.State
 import Manager.Types
 
 data Frame (a :: MemType) = Frame
-             { frameId :: FrameId -- Actually, FrameId is also Frame offset
+             { frameId :: FrameId a -- Actually, FrameId is also Frame offset
              , mem :: [Word8]
              } deriving (Show, Eq)
 
@@ -20,10 +22,17 @@ data FrameTable = FT { ramFreeOffs :: [Offset (Frame 'Ram)]
                      , swapF :: NonEmpty [Frame 'Swap] -- SWAP frames
                      }
 
+idToOff :: FrameId a -> Offset (Frame a)
+idToOff = Offset . unFid
+
+offToId :: Offset (Frame a) -> FrameId a
+offToId (Offset i) = Fid i
+
 class Frames a where
   getFreeFrameOffset :: Has (State FrameTable) sig m => m (Maybe (Offset (Frame a)))
-  setFrameFree :: Has (State FrameTable) sig m => Offset (Frame a) -> m ()
-  getFrame :: Has (State FrameTable) sig m => FrameId -> m (Frame a)
+  setFrameFree :: Has (State FrameTable) sig m => FrameId a -> m ()
+  setFrameNotFree :: Has (State FrameTable) sig m => FrameId a -> m ()
+  getFrame :: Has (State FrameTable) sig m => FrameId a -> m (Frame a)
   writeFrame :: Has (State FrameTable) sig m => Frame a -> Offset Word8 -> [Word8] -> m ()
   readFrame :: Has (State FrameTable) sig m => Frame a -> Offset (Frame a) -> CountOf Word8 -> m ([Word8])
 
@@ -42,8 +51,12 @@ instance Frames 'Ram where
         return (Just x)
       [] -> return Nothing
 
-  setFrameFree offset = do
-    modify (\(FT xs ram ys sw) -> FT (offset:xs) ram ys sw)
+  setFrameFree fid = do
+    modify (\(FT xs ram ys sw) -> FT (idToOff fid : xs) ram ys sw)
+
+  setFrameNotFree fid = do
+    let off = idToOff fid
+    modify $ \(FT xs ram ys sw) -> FT (filter (/= off) xs) ram ys sw
 
   getFrame fId = do
     (FT _ ram _ _) <- get
@@ -70,8 +83,12 @@ instance Frames 'Swap where
         return (Just x)
       [] -> return Nothing
 
-  setFrameFree offset = do
-    modify (\(FT xs ram ys sw) -> FT xs ram (offset:ys) sw)
+  setFrameFree fid = do
+    modify (\(FT xs ram ys sw) -> FT xs ram (idToOff fid : ys) sw)
+
+  setFrameNotFree fid = do
+    let off = idToOff fid
+    modify $ \(FT xs ram ys sw) -> FT xs ram (filter (/= off) ys) sw
 
   getFrame fId = do
     (FT _ _ _ sw) <- get

@@ -1,8 +1,10 @@
 module Manager
-  ( loadPage
-  , unloadPage
-  , writePage
-  , readPage
+  ( allocPage
+  , freePage
+  , writeMem
+  , readMem
+  , moveToRam
+  , moveToSwap
   , module Manager.Types
   , module Manager.Page
   , module Manager.Frame
@@ -10,11 +12,10 @@ module Manager
   )
 where
 
-import Data.Bits
+-- import Data.Bits
 import GHC.Types
 
 import Foundation
-import Foundation.Collection
 import Control.Effect.State
 import Control.Effect.Catch
 import Control.Effect.Throw
@@ -38,94 +39,83 @@ type ManagerSig sig m = ( Has (State FrameTable) sig m
                         )
 
 -- Find free RAM frame (if available), if not, unload frame from RAM to SWAP and use it
-createPage :: ManagerSig sig m => ProcessId -> m (Maybe (Page 'Ram))
-createPage pid = undefined
+allocPage :: ManagerSig sig m => ProcessId -> m (Maybe (Page 'Ram))
+allocPage pid = undefined
 
 -- Find corresponding frame and mark it free, then delete page from pool of pages
-deletePage :: ManagerSig sig m => Page a -> m ()
-deletePage p = undefined
-
--- Used only in situation, where no free Ram pages exists
--- which means, that ram array is not empty
-findPageToUnload :: ManagerSig sig m => m (Page 'Ram)
-findPageToUnload = do
-  (ram, _) <- get @PageTable
-  return . foldl1' (\acc el -> if age el < age acc then el else acc) $ nonEmpty_ ram
+freePage :: ManagerSig sig m => Page a -> m ()
+freePage p = undefined
 
 -- Load page from SWAP to RAM
-loadPage :: ManagerSig sig m => Page 'Swap -> m ()
-loadPage p@(Page { frId, pId }) = do
+moveToRam :: ManagerSig sig m => Page 'Swap -> m ()
+moveToRam p@(Page { frId, pId }) = do
   -- Get free RAM Frame
   offM <- getFreeFrameOffset @'Ram
   case offM of
     -- If there is a free RAM page, use it
     Just off -> do 
-      -- get offset corresponding to the swap frame that needs to be freed
-      let swapOff = idToOff frId
-      -- Free SWAP Frame
-      setFrameFree @'Swap swapOff
+      -- Delete page and free corresponding frame
+      deletePage p
+      setFrameFree frId
 
-      -- get frameId corresponding to the free frame
-      let fId = offToId off
-      let np = Page fId (Age 100) Ram False False pId
+      -- create new page and mark corresponding frame not free
+      np <- createPage (offToId off) pId
+      setFrameNotFree (offToId off)
 
-      -- save memory
+      -- move memory
       copyMem p np
-
-      -- replace existing page with new page corresponding to the found Frame
-      modify @PageTable $ bimap (np:) (filter (/= p))
-
     -- If there is no free RAM page available, then find one, that can be unloaded
     Nothing -> do
-      -- fId - Ram frame id(and offset) that would be free after page unloading
       pu@(Page { frId = fId }) <- findPageToUnload
+      moveToSwap pu
+
+      np <- createPage fId pId
       -- mark Swap Frame that we're unloading from as free
-      setFrameFree @'Swap $ idToOff frId
-      -- if there are no free swap frames, this ^ can give us one frame that we need
-      unloadPage pu
-      let np = Page fId (Age 100) Ram False False pId
+      setFrameFree frId
       copyMem p np
-      modify @PageTable $ first (np:)
+      setFrameNotFree fId
 
 -- Copy memory from one page to another
 copyMem :: ManagerSig sig m => Page a -> Page b -> m ()
 copyMem f t = do
   env <- ask @Env
-  mem <- readPage f (Offset 0) $ memSize env
-  writePage t (Offset 0) mem
+  mem <- readMem f (Offset 0) $ memSize env
+  writeMem t (Offset 0) mem
 
 -- Unload page from RAM to SWAP
-unloadPage :: ManagerSig sig m => Page 'Ram -> m ()
-unloadPage p@(Page {frId, pId}) = do
+moveToSwap :: ManagerSig sig m => Page 'Ram -> m ()
+moveToSwap p@(Page {frId, pId}) = do
   offM <- getFreeFrameOffset @'Swap
   case offM of
     Just off -> do
-      setFrameFree @'Ram $ idToOff frId
-      let np = Page (offToId off) (Age 100) Swap False False pId
+      -- Create new page and mark corresponding frame NOT free
+      setFrameNotFree $ offToId off
+      np <- createPage (offToId off) pId
 
       -- save memory
       copyMem p np
 
       -- delete current page from RAM pages and add new page to the SWAP pages
-      modify @PageTable $ bimap (filter (/= p)) (np:)
+      deletePage p
+      setFrameFree frId
 
     -- if no free Swap frames exists -> throw error
     Nothing -> throwError NoFreeSwapFrames
 
 -- Write memory to the page
-writePage :: ManagerSig sig m => Page a -> Offset Word8 -> [Word8] -> m ()
-writePage (Page { frId, memType }) off mem = do
-  case memType of
-    Ram -> do
-      f <- getFrame @'Ram frId
+writeMem :: ManagerSig sig m => Page a -> Offset Word8 -> [Word8] -> m ()
+writeMem (Page { frId, memType }) off mem = do
+  case memType of 
+    Ram -> do 
+      f <- getFrame @'Ram (Fid $ unFid frId)
       writeFrame f off mem
     Swap -> do
-      f <- getFrame @'Swap frId
+      f <- getFrame @'Swap (Fid $ unFid frId)
       writeFrame f off mem
 
 -- Read memory from the page
-readPage :: ManagerSig sig m => Page a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
-readPage p off count = undefined
+readMem :: ManagerSig sig m => Page a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
+readMem p off count = undefined
 
 -- ageWorld :: (MonadError String m, MonadReader Env m, MonadIO m) => m ()
 -- ageWorld = do
