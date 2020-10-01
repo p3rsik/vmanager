@@ -1,9 +1,5 @@
-{-# LANGUAGE ConstraintKinds #-}
-
 module Manager
-  ( createPage
-  , deletePage
-  , loadPage
+  ( loadPage
   , unloadPage
   , writePage
   , readPage
@@ -34,11 +30,12 @@ data ManagerError = CantCreatePage
                   | FuckYou 
                   deriving (Eq, Ord)
 
-type ManagerSig sig m = (Has (State FrameTable) sig m,
-                      Has (State PageTable) sig m,
-                      Has (Reader Env) sig m,
-                      Has (Throw ManagerError) sig m,
-                      Has (Catch ManagerError) sig m)
+type ManagerSig sig m = ( Has (State FrameTable) sig m
+                        , Has (State PageTable) sig m
+                        , Has (Reader Env) sig m
+                        , Has (Throw ManagerError) sig m
+                        , Has (Catch ManagerError) sig m
+                        )
 
 -- Find free RAM frame (if available), if not, unload frame from RAM to SWAP and use it
 createPage :: ManagerSig sig m => ProcessId -> m (Maybe (Page 'Ram))
@@ -57,7 +54,7 @@ findPageToUnload = do
 
 -- Load page from SWAP to RAM
 loadPage :: ManagerSig sig m => Page 'Swap -> m ()
-loadPage p@(Page {frId, pId}) = do
+loadPage p@(Page { frId, pId }) = do
   -- Get free RAM Frame
   offM <- getFreeFrameOffset @'Ram
   case offM of
@@ -81,7 +78,7 @@ loadPage p@(Page {frId, pId}) = do
     -- If there is no free RAM page available, then find one, that can be unloaded
     Nothing -> do
       -- fId - Ram frame id(and offset) that would be free after page unloading
-      pu@(Page {frId = fId}) <- findPageToUnload
+      pu@(Page { frId = fId }) <- findPageToUnload
       -- mark Swap Frame that we're unloading from as free
       setFrameFree @'Swap $ idToOff frId
       -- if there are no free swap frames, this ^ can give us one frame that we need

@@ -37,6 +37,7 @@ library:
     - KindSignatures
     - NamedFieldPuns
     - TypeApplications
+    - ConstraintKinds
 
 executables:
   vmanager-exe:

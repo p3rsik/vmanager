@@ -34,7 +34,7 @@ library
       Paths_vmanager
   hs-source-dirs:
       src
-  default-extensions: OverloadedStrings NoImplicitPrelude DataKinds KindSignatures NamedFieldPuns TypeApplications
+  default-extensions: OverloadedStrings NoImplicitPrelude DataKinds KindSignatures NamedFieldPuns TypeApplications ConstraintKinds
   ghc-options: -Wall
   build-depends:
       base >=4.7 && <5
