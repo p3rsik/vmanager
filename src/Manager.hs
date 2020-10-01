@@ -47,6 +47,7 @@ allocPage pid = do
     Just off -> do
       np <- createPage (offToId off) pid
       return np
+
     -- otherwise move specific page to swap and alloc a new page
     Nothing -> do
       -- unload a page to swap and create a new one instead
@@ -68,32 +69,10 @@ freePage p@(Page { frId }) = do
 
 -- Load page from SWAP to RAM
 moveToRam :: ManagerSig sig m => Page 'Swap -> m ()
-moveToRam p@(Page { frId, pId }) = do
-  -- Get free RAM Frame
-  offM <- getFreeFrameOffset @'Ram
-  case offM of
-    -- If there is a free RAM page, use it
-    Just off -> do 
-      -- Delete page and free corresponding frame
-      deletePage p
-      setFrameFree frId
-
-      -- create new page and mark corresponding frame not free
-      np <- createPage (offToId off) pId
-
-      -- move memory
-      copyMem p np
-    -- If there is no free RAM page available, then find one, that can be unloaded
-    Nothing -> do
-      pu@(Page { frId = fId }) <- findPageToUnload
-      moveToSwap pu
-
-      np <- createPage fId pId
-      -- mark Swap Frame that we're unloading from as free
-      setFrameFree frId
-      copyMem p np
-      -- findPageToUnload doesn't mark underlying Frame as free, so we need to do it manually
-      setFrameNotFree fId
+moveToRam p@(Page { pId }) = do
+  np <- allocPage pId
+  copyMem p np
+  freePage p
 
 
 -- Copy memory from one page to another
@@ -106,20 +85,15 @@ copyMem f t = do
 
 -- Unload page from RAM to SWAP
 moveToSwap :: ManagerSig sig m => Page 'Ram -> m ()
-moveToSwap p@(Page { frId, pId }) = do
+moveToSwap p@(Page { pId }) = do
   offM <- getFreeFrameOffset @'Swap
   case offM of
     Just off -> do
       -- Create new page and mark corresponding frame NOT free
       np <- createPage (offToId off) pId
-
       -- save memory
       copyMem p np
-
-      -- delete current page from RAM pages and add new page to the SWAP pages
-      deletePage p
-      setFrameFree frId
-
+      freePage p
     -- if no free Swap frames exists -> throw error
     Nothing -> throwError NoFreeSwapFrames
 
