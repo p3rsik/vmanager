@@ -13,8 +13,6 @@ module Manager
 where
 
 -- import Data.Bits
-import GHC.Types
-
 import Foundation
 import Control.Effect.State
 import Control.Effect.Catch
@@ -60,7 +58,6 @@ moveToRam p@(Page { frId, pId }) = do
 
       -- create new page and mark corresponding frame not free
       np <- createPage (offToId off) pId
-      setFrameNotFree (offToId off)
 
       -- move memory
       copyMem p np
@@ -73,6 +70,7 @@ moveToRam p@(Page { frId, pId }) = do
       -- mark Swap Frame that we're unloading from as free
       setFrameFree frId
       copyMem p np
+      -- findPageToUnload doesn't mark underlying Frame as free, so we need to do it manually
       setFrameNotFree fId
 
 -- Copy memory from one page to another
@@ -89,7 +87,6 @@ moveToSwap p@(Page {frId, pId}) = do
   case offM of
     Just off -> do
       -- Create new page and mark corresponding frame NOT free
-      setFrameNotFree $ offToId off
       np <- createPage (offToId off) pId
 
       -- save memory
