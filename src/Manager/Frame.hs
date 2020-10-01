@@ -34,9 +34,9 @@ class Frames a where
   setFrameNotFree :: Has (State FrameTable) sig m => FrameId a -> m ()
   getFrame :: Has (State FrameTable) sig m => FrameId a -> m (Frame a)
   writeFrame :: Has (State FrameTable) sig m => Frame a -> Offset Word8 -> [Word8] -> m ()
-  readFrame :: Has (State FrameTable) sig m => Frame a -> Offset (Frame a) -> CountOf Word8 -> m ([Word8])
+  readFrame :: Has (State FrameTable) sig m => Frame a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
 
-readFrame' :: Has (State FrameTable) sib m => Frame a -> Offset (Frame a) -> CountOf Word8 -> m ([Word8])
+readFrame' :: Has (State FrameTable) sib m => Frame a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
 readFrame' (Frame _ mem') (Offset off) co = do
  let (_, m) = splitAt (toCount off) mem'
  let (r, _) = splitAt co m
