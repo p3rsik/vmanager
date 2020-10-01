@@ -36,13 +36,40 @@ type ManagerSig sig m = ( Has (State FrameTable) sig m
                         , Has (Catch ManagerError) sig m
                         )
 
+
 -- Find free RAM frame (if available), if not, unload frame from RAM to SWAP and use it
-allocPage :: ManagerSig sig m => ProcessId -> m (Maybe (Page 'Ram))
-allocPage pid = undefined
+allocPage :: ManagerSig sig m => ProcessId -> m (Page 'Ram)
+allocPage pid = do
+  -- get offset of any free frame
+  offM <- getFreeFrameOffset @'Ram
+  case offM of
+    -- in case free frame exists, then alloc a new page
+    Just off -> do
+      np <- createPage (offToId off) pid
+      return np
+    -- otherwise move specific page to swap and alloc a new page
+    Nothing -> do
+      -- unload a page to swap and create a new one instead
+      p@(Page {frId}) <- findPageToUnload
+      moveToSwap p
+
+      np <- createPage frId pid
+      setFrameNotFree frId
+
+      return np
+
 
 -- Find corresponding frame and mark it free, then delete page from pool of pages
 freePage :: ManagerSig sig m => Page a -> m ()
-freePage p = undefined
+freePage (Page {frId, age, memType, wBit, rBit, pId}) = do
+  case memType of
+    Ram -> do
+      let p = Page (Fid $ unFid frId) age memType wBit rBit pId
+      deletePage @'Ram p
+    Swap -> do
+      let p = Page (Fid $ unFid frId) age memType wBit rBit pId
+      deletePage @'Swap p
+
 
 -- Load page from SWAP to RAM
 moveToRam :: ManagerSig sig m => Page 'Swap -> m ()
@@ -73,12 +100,14 @@ moveToRam p@(Page { frId, pId }) = do
       -- findPageToUnload doesn't mark underlying Frame as free, so we need to do it manually
       setFrameNotFree fId
 
+
 -- Copy memory from one page to another
 copyMem :: ManagerSig sig m => Page a -> Page b -> m ()
 copyMem f t = do
   env <- ask @Env
   mem <- readMem f (Offset 0) $ memSize env
   writeMem t (Offset 0) mem
+
 
 -- Unload page from RAM to SWAP
 moveToSwap :: ManagerSig sig m => Page 'Ram -> m ()
@@ -99,6 +128,7 @@ moveToSwap p@(Page {frId, pId}) = do
     -- if no free Swap frames exists -> throw error
     Nothing -> throwError NoFreeSwapFrames
 
+
 -- Write memory to the page
 writeMem :: ManagerSig sig m => Page a -> Offset Word8 -> [Word8] -> m ()
 writeMem (Page { frId, memType }) off mem = do
@@ -110,9 +140,21 @@ writeMem (Page { frId, memType }) off mem = do
       f <- getFrame @'Swap (Fid $ unFid frId)
       writeFrame f off mem
 
+
 -- Read memory from the page
 readMem :: ManagerSig sig m => Page a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
-readMem p off count = undefined
+readMem (Page {frId, memType}) off count = do
+  case memType of
+    Ram -> do
+      p <- getFrame @'Ram (Fid $ unFid frId)
+      mem <- readFrame p off count
+      return mem
+    Swap -> do
+      p <- getFrame @'Swap (Fid $ unFid frId)
+      mem <- readFrame p off count
+      return mem
+
+
 
 -- ageWorld :: (MonadError String m, MonadReader Env m, MonadIO m) => m ()
 -- ageWorld = do
