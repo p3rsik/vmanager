@@ -50,7 +50,7 @@ allocPage pid = do
     -- otherwise move specific page to swap and alloc a new page
     Nothing -> do
       -- unload a page to swap and create a new one instead
-      p@(Page {frId}) <- findPageToUnload
+      p@(Page { frId }) <- findPageToUnload
       moveToSwap p
 
       np <- createPage frId pid
@@ -61,7 +61,7 @@ allocPage pid = do
 
 -- Find corresponding frame and mark it free, then delete page from pool of pages
 freePage :: ManagerSig sig m => Page a -> m ()
-freePage (Page {frId, age, memType, wBit, rBit, pId}) = do
+freePage (Page { frId, age, memType, wBit, rBit, pId }) = do
   case memType of
     Ram -> do
       let p = Page (Fid $ unFid frId) age memType wBit rBit pId
@@ -111,7 +111,7 @@ copyMem f t = do
 
 -- Unload page from RAM to SWAP
 moveToSwap :: ManagerSig sig m => Page 'Ram -> m ()
-moveToSwap p@(Page {frId, pId}) = do
+moveToSwap p@(Page { frId, pId }) = do
   offM <- getFreeFrameOffset @'Swap
   case offM of
     Just off -> do
@@ -143,16 +143,14 @@ writeMem (Page { frId, memType }) off mem = do
 
 -- Read memory from the page
 readMem :: ManagerSig sig m => Page a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
-readMem (Page {frId, memType}) off count = do
+readMem (Page { frId, memType }) off count = do
   case memType of
     Ram -> do
-      p <- getFrame @'Ram (Fid $ unFid frId)
-      mem <- readFrame p off count
-      return mem
+      f <- getFrame @'Ram (Fid $ unFid frId)
+      readFrame f off count
     Swap -> do
-      p <- getFrame @'Swap (Fid $ unFid frId)
-      mem <- readFrame p off count
-      return mem
+      f <- getFrame @'Swap (Fid $ unFid frId)
+      readFrame f off count
 
 
 
