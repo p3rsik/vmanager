@@ -8,7 +8,7 @@ module Manager
   , module Manager.Types
   , module Manager.Page
   , module Manager.Frame
-  , module Manager.Env
+  , module Env
   )
 where
 
@@ -19,7 +19,7 @@ import Control.Effect.Catch
 import Control.Effect.Throw
 
 import Manager.Frame
-import Manager.Env
+import Env
 import Manager.Page
 import Manager.Types
 

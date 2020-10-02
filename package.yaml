@@ -25,6 +25,7 @@ dependencies:
 - basement
 - fused-effects
 - ghc-prim
+- hashmap
 
 library:
   source-dirs: src
@@ -68,6 +69,7 @@ tests:
     - fused-effects
     - hspec
     - QuickCheck
+    - hashmap
     default-extensions:
       - OverloadedStrings
       - NoImplicitPrelude

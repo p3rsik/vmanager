@@ -1,4 +1,4 @@
-module Manager.Env
+module Env
   ( Env (..)
   ) where
 
