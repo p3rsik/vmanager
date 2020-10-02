@@ -65,6 +65,7 @@ tests:
     dependencies:
     - vmanager
     - foundation
+    - fused-effects
     - hspec
     - QuickCheck
     default-extensions:
