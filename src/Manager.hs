@@ -17,7 +17,6 @@ import Foundation
 import Control.Effect.State
 import Control.Effect.Catch
 import Control.Effect.Throw
-import Control.Effect.Reader
 
 import Manager.Frame
 import Manager.Env
@@ -31,7 +30,6 @@ data ManagerError = CantCreatePage
 
 type ManagerSig sig m = ( Has (State FrameTable) sig m
                         , Has (State PageTable) sig m
-                        , Has (Reader Env) sig m
                         , Has (Throw ManagerError) sig m
                         , Has (Catch ManagerError) sig m
                         )
@@ -77,9 +75,9 @@ moveToRam p@(Page { pId }) = do
 
 -- Copy memory from one page to another
 copyMem :: (Pages a, Frames a, Pages b, Frames b, ManagerSig sig m) => Page a -> Page b -> m ()
-copyMem f t = do
-  env <- ask @Env
-  mem <- readMem f (Offset 0) $ memSize env
+copyMem (Page { frId }) t = do
+  f <- getFrame frId
+  mem <- readFullFrame f
   writeMem t (Offset 0) mem
 
 
