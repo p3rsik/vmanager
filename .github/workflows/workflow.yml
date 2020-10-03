@@ -3,15 +3,10 @@ name: Tests
 
 jobs:
   manager-test:
-    name: Haskell GHC ${{ matrix.ghc }} && Stack ${{ matrix.stack }} test
+    name: Stack test
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v2
       - name: Setup Haskell
-        uses: actions/setup-haskell@v1.1
-        with:
-          ghc-version: '8.10.1'
-          enable-stack: true
-          stack-version: 'latest'
+        uses: mstksg/setup-stack@v1
       - run: stack test
