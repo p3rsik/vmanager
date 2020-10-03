@@ -2,11 +2,32 @@ on: [push, pull_request]
 name: Tests
 
 jobs:
-  manager-test:
-    name: Stack test
+  stack:
+    name: GHC ${{ matrix.ghc }} && Stack ${{ matrix.stack }} 
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        stack: ["2.3.1"]
+        ghc: ["8.10.1"]
+
     steps:
-      - uses: actions/checkout@v2
-      - name: Setup Haskell
-        uses: mstksg/setup-stack@v1
-      - run: stack test
+    - uses: actions/checkout@v2
+
+    - uses: actions/setup-haskell@v1.1
+      name: Setup Haskell Stack
+      with:
+        ghc-version: ${{ matrix.ghc }}
+        enable-stack: true
+        stack-version: ${{ matrix.stack }}
+
+    - uses: actions/cache@v1
+      name: Cache ~/.stack
+      with:
+        path: ~/.stack
+        key: ${{ runner.os }}-${{ matrix.ghc }}-stack
+
+    - name: Stack build
+      run: stack build
+
+    - name: Stack test
+      run: stack test
