@@ -21,9 +21,9 @@ jobs:
         stack-version: ${{ matrix.stack }}
 
     - uses: actions/cache@v1
-      name: Cache ~/.stack
+      name: Cache ~/.stack/programs
       with:
-        path: ~/.stack
+        path: ~/.stack/programs
         key: ${{ runner.os }}-${{ matrix.ghc }}-stack
 
     - name: Stack build
