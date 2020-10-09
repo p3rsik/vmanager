@@ -9,7 +9,7 @@ module Manager.Frame
 import Foundation
 import Foundation.Collection
 import Control.Effect.State
-import Manager.Types
+import Types
 
 data Frame (a :: MemType) = Frame
              { frameId :: FrameId a -- Actually, FrameId is also Frame offset
@@ -34,17 +34,17 @@ class Frames a where
   setFrameNotFree :: Has (State FrameTable) sig m => FrameId a -> m ()
   getFrame :: Has (State FrameTable) sig m => FrameId a -> m (Frame a)
   writeFrame :: Has (State FrameTable) sig m => Frame a -> Offset Word8 -> [Word8] -> m ()
-  readFrame :: Has (State FrameTable) sig m => Frame a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
+  readFrame :: Has (State FrameTable) sig m => Frame a -> Offset Word8 -> CountOf Word8 -> m [Word8]
   -- specialized version of readFrame that returns whole frame memory
-  readFullFrame :: Has (State FrameTable) sig m => Frame a -> m ([Word8])
+  readFullFrame :: Has (State FrameTable) sig m => Frame a -> m [Word8]
 
-readFrame' :: Has (State FrameTable) sib m => Frame a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
+readFrame' :: Has (State FrameTable) sib m => Frame a -> Offset Word8 -> CountOf Word8 -> m [Word8]
 readFrame' (Frame _ mem') (Offset off) co = do 
   let (_, m) = splitAt (toCount off) mem'
   let (r, _) = splitAt co m
-  return (r)
+  return r
 
-readFullFrame' :: Has (State FrameTable) sib m => Frame a -> m ([Word8])
+readFullFrame' :: Has (State FrameTable) sib m => Frame a -> m [Word8]
 readFullFrame' (Frame _ mem') = return mem'
 
 instance Frames 'Ram where
