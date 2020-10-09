@@ -35,8 +35,6 @@ class Frames a where
   getFrame :: Has (State FrameTable) sig m => FrameId a -> m (Frame a)
   writeFrame :: Has (State FrameTable) sig m => Frame a -> Offset Word8 -> [Word8] -> m ()
   readFrame :: Has (State FrameTable) sig m => Frame a -> Offset Word8 -> CountOf Word8 -> m [Word8]
-  -- specialized version of readFrame that returns whole frame memory
-  readFullFrame :: Has (State FrameTable) sig m => Frame a -> m [Word8]
 
 readFrame' :: Has (State FrameTable) sib m => Frame a -> Offset Word8 -> CountOf Word8 -> m [Word8]
 readFrame' (Frame _ mem') (Offset off) co = do 
@@ -44,8 +42,6 @@ readFrame' (Frame _ mem') (Offset off) co = do
   let (r, _) = splitAt co m
   return r
 
-readFullFrame' :: Has (State FrameTable) sib m => Frame a -> m [Word8]
-readFullFrame' (Frame _ mem') = return mem'
 
 instance Frames 'Ram where
   getFreeFrameOffset = do 
@@ -78,7 +74,6 @@ instance Frames 'Ram where
     modify $ \(FT rfo ram sfo swap') -> FT rfo (replace ram) sfo swap'
 
   readFrame = readFrame'
-  readFullFrame = readFullFrame'
 
 instance Frames 'Swap where
   getFreeFrameOffset = do
@@ -111,4 +106,3 @@ instance Frames 'Swap where
     modify $ \(FT rfo ram sfo swap') -> FT rfo ram sfo $ replace swap'
 
   readFrame = readFrame'
-  readFullFrame = readFullFrame'

@@ -75,8 +75,7 @@ moveToRam p@Page { pId } = do
 -- Copy memory from one page to another
 copyMem :: (Pages a, Frames a, Pages b, Frames b, ManagerSig sig m) => Page a -> Page b -> m ()
 copyMem Page { frId } t = do
-  f <- getFrame frId
-  mem <- readFullFrame f
+  (Frame _ mem) <- getFrame frId
   writeMem t (Offset 0) mem
 
 
