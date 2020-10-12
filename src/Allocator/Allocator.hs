@@ -1,64 +1,70 @@
 module Allocator.Allocator where
 
-import Env
-import Manager
-import Foundation
 import Control.Effect.Error
 import Control.Effect.State
-import Data.HashMap.Lazy
 import Control.Monad
+import Data.HashMap.Lazy
+import Env
+import Foundation
+import Manager
 
 -- map of processes to its pages
 type PMap = HashMap ProcessId [Page 'Ram]
+
 type Ptr = Int
-newtype Size = Size { unSize :: CountOf Word8 } deriving (Eq, Show)
 
 data AllocError = OutOfMemory deriving (Eq, Ord)
 
-type AllocSig sig m = ( Has (State PMap) sig m
-                      , Has (Throw AllocError) sig m
-                      , Has (Catch AllocError) sig m)
-
-
+type AllocSig sig m =
+  ( Has (State PMap) sig m,
+    Has (Throw AllocError) sig m,
+    Has (Catch AllocError) sig m
+  )
 
 -- TODO mock of env, actually should be exported from somewhere
 env :: Env
 env = Env 1024 0 0
 
 class Allocator a where
-    alloc   :: (ManagerSig sig m, Has (State PMap) sig m) => a -> Size -> m (Maybe Ptr)
-    realloc :: (ManagerSig sig m, Has (State PMap) sig m) => a -> Ptr -> Size -> m (Maybe Ptr)
-    -- TODO free should return an error or (Nothing, ok, anything else?), is Maybe sufficient for that?
-    free    :: (ManagerSig sig m, Has (State PMap) sig m) => a -> Ptr -> m (Maybe Ptr)
+  alloc :: (ManagerSig sig m, Has (State PMap) sig m) => a -> CountOf Word8 -> m (Maybe Ptr)
+  free :: (ManagerSig sig m, Has (State PMap) sig m) => a -> m (Maybe a)
 
 class Pointer a where
-  fromOffs :: Integral b => b -> a
-  toOffs :: Integral b => a -> b
-
+  fromOffs :: (Monad m) => PMap -> ProcessId -> Integer -> m a
 
 instance Pointer Int where
-    fromOffs = undefined
-    toOffs = undefined
-
+  fromOffs pm pid np = do
+    return $ (fromCount (length pn) - fromIntegral np) * fromCount (memSize env)
+    where
+      pn = fromMaybe [] $ lookup pid pm
 
 instance Allocator ProcessId where
-    alloc pid sz = do
-        -- TODO instead of 128 should be frame size from Env
-        let np = fromCount (unSize sz) `div` 1024
+  alloc pid sz = do
+    case sz of
+      0 -> return Nothing
 
-        -- allocating np number of pages
-        ps <- mapM allocPage [pid | _ <- [1..np]]
-        -- add pages to pid map
-        modify @PMap $ adjust (<> ps) pid
-        -- in case at least one page in `ps` exists then return Ptr to it, otherwise Nothing
-        let fp = find (const True) ps
-        return $ case fp of
-            (Just Page { frId }) -> Just $ fromOffs $ unFid frId
-            Nothing -> Nothing
+    -- number of new pages to alloc
+    let npNotAligned = fromCount sz `div` fromCount (memSize env)
+    let np = npNotAligned + align
+          where
+            align =
+              if npNotAligned < fromCount sz
+                then 1
+                else 0
 
-    realloc pid pt sz = free pid pt >> alloc pid sz
+    -- allocating np number of pages
+    ps <- mapM allocPage [pid | _ <- [1 .. np]]
+    -- add pages to pid map
+    modify @PMap $ adjust (<> ps) pid
+    -- in case at least one page in `ps` exists then return Ptr to it, otherwise Nothing
 
-    free pid ptr = do
-        modify @PMap $ adjust (Foundation.filter (\Page { frId } -> unFid frId /= toOffs ptr)) pid
+    let ptr = (fromCount (length ps) - np) * fromCount (memSize env)
 
-        return Nothing
+    -- if there was allocated zero pages - return nothing
+    return $ case find (const True) ps of
+      (Just _) -> Just ptr
+      Nothing -> Nothing
+
+  free pid = do
+    modify @PMap $ delete pid
+    return Nothing
