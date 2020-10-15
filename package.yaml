@@ -25,6 +25,8 @@ dependencies:
 - basement
 - fused-effects
 - ghc-prim
+- unordered-containers
+- hashable
 
 library:
   source-dirs: src
@@ -38,6 +40,10 @@ library:
     - NamedFieldPuns
     - TypeApplications
     - ConstraintKinds
+    - StandaloneDeriving
+    - DerivingVia
+    - FlexibleInstances
+    - RecordWildCards
 
 executables:
   vmanager-exe:

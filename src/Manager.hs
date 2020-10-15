@@ -5,10 +5,11 @@ module Manager
   , readMem
   , moveToRam
   , moveToSwap
-  , module Manager.Types
+  , ManagerSig
+  , module Types
   , module Manager.Page
   , module Manager.Frame
-  , module Manager.Env
+  , module Env
   )
 where
 
@@ -19,9 +20,9 @@ import Control.Effect.Catch
 import Control.Effect.Throw
 
 import Manager.Frame
-import Manager.Env
+import Env
 import Manager.Page
-import Manager.Types
+import Types
 
 data ManagerError = CantCreatePage 
                   | NoFreeSwapFrames
@@ -42,14 +43,12 @@ allocPage pid = do
   offM <- getFreeFrameOffset @'Ram
   case offM of
     -- in case free frame exists, then alloc a new page
-    Just off -> do
-      np <- createPage (offToId off) pid
-      return np
+    Just off -> createPage (offToId off) pid
 
     -- otherwise move specific page to swap and alloc a new page
     Nothing -> do
       -- unload a page to swap and create a new one instead
-      p@(Page { frId }) <- findPageToUnload
+      p@Page { frId } <- findPageToUnload
       moveToSwap p
 
       np <- createPage frId pid
@@ -60,14 +59,14 @@ allocPage pid = do
 
 -- Find corresponding frame and mark it free, then delete page from pool of pages
 freePage :: (Pages a, Frames a, ManagerSig sig m) => Page a -> m ()
-freePage p@(Page { frId }) = do
+freePage p@Page { frId } = do
   deletePage p
   setFrameFree frId
 
 
 -- Load page from SWAP to RAM
 moveToRam :: ManagerSig sig m => Page 'Swap -> m ()
-moveToRam p@(Page { pId }) = do
+moveToRam p@Page { pId } = do
   np <- allocPage pId
   copyMem p np
   freePage p
@@ -75,14 +74,14 @@ moveToRam p@(Page { pId }) = do
 
 -- Copy memory from one page to another
 copyMem :: (Pages a, Frames a, Pages b, Frames b, ManagerSig sig m) => Page a -> Page b -> m ()
-copyMem (Page { frId }) t = do
+copyMem Page { frId } t = do
   (Frame _ mem) <- getFrame frId
   writeMem t (Offset 0) mem
 
 
 -- Unload page from RAM to SWAP
 moveToSwap :: ManagerSig sig m => Page 'Ram -> m ()
-moveToSwap p@(Page { pId }) = do
+moveToSwap p@Page { pId } = do
   offM <- getFreeFrameOffset @'Swap
   case offM of
     Just off -> do
@@ -97,14 +96,14 @@ moveToSwap p@(Page { pId }) = do
 
 -- Write memory to the page
 writeMem :: (Pages a, Frames a, ManagerSig sig m) => Page a -> Offset Word8 -> [Word8] -> m ()
-writeMem (Page { frId }) off mem = do
+writeMem Page { frId } off mem = do
   f <- getFrame frId
   writeFrame f off mem
 
 
 -- Read memory from the page
-readMem :: (Pages a, Frames a, ManagerSig sig m) => Page a -> Offset Word8 -> CountOf Word8 -> m ([Word8])
-readMem (Page { frId }) off count = do
+readMem :: (Pages a, Frames a, ManagerSig sig m) => Page a -> Offset Word8 -> CountOf Word8 -> m [Word8]
+readMem Page { frId } off count = do
   f <- getFrame frId
   readFrame f off count
 

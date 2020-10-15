@@ -8,7 +8,7 @@ module Manager.Page
 import Foundation
 import Foundation.Collection
 import Control.Effect.State
-import Manager.Types
+import Types
 
 data Page (a :: MemType) = Page
             { frId :: FrameId a
@@ -46,10 +46,10 @@ instance Pages 'Ram where
 
   getPage fid = do
     (ram, _) <- get @PageTable
-    let frM = find (\(Page { frId }) -> if frId == fid then True else False) ram
+    let frM = find (\Page { frId } -> frId == fid) ram
     return frM
   
-  movePage p@(Page { pId }) fid = do
+  movePage p@Page { pId } fid = do
     np <- createPage (Fid $ unFid fid) pId
     modify @PageTable $ bimap (filter (/= p)) (np:)
 
@@ -64,9 +64,9 @@ instance Pages 'Swap where
 
   getPage fid = do
     (_, sw) <- get @PageTable
-    let frM = find (\(Page { frId }) -> if frId == fid then True else False) sw
+    let frM = find (\Page { frId } -> frId == fid) sw
     return frM
   
-  movePage p@(Page { pId }) fid = do
+  movePage p@Page { pId } fid = do
     np <- createPage (Fid $ unFid fid) pId
     modify @PageTable $ bimap (np:) (filter (/= p))

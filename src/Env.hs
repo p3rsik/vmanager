@@ -1,11 +1,11 @@
-module Manager.Env
+module Env
   ( Env (..)
   ) where
 
 import Foundation
 
 import Manager.Frame (Frame)
-import Manager.Types
+import Types
 
 data Env = Env { memSize :: CountOf Word8 -- Size of memory in one Frame
                , ramSize :: CountOf (Frame 'Ram) -- Number of Ram Frame's

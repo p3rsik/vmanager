@@ -9,14 +9,14 @@ import Control.Algebra
 import Test.Hspec
 import qualified Test.QuickCheck as Q
 import qualified Test.QuickCheck.Monadic as QM
-import Manager.Types
+import Types
 import Manager.Frame
 
 idToOffToId :: Q.NonNegative Int -> Bool
-idToOffToId (Q.NonNegative x) = (idToOff . offToId $ Offset x) == (Offset x)
+idToOffToId (Q.NonNegative x) = (idToOff . offToId $ Offset x) == Offset x
 
 offToIdToOff :: Q.NonNegative Int -> Bool
-offToIdToOff (Q.NonNegative x) = (offToId . idToOff $ Fid x) == (Fid x)
+offToIdToOff (Q.NonNegative x) = (offToId . idToOff $ Fid x) == Fid x
 
 frameNumber = 32
 
@@ -33,12 +33,12 @@ getFrameTest :: Q.Property
 getFrameTest = Q.forAll (Q.choose (0, frameNumber)) $ \x ->
     let res = run' $ getFrame (Fid x :: FrameId 'Ram)
         (FT _ ram _ _) = startingState
-        res' = nonEmpty_ . filter (\f -> x == (unFid $ frameId f)) $ getNonEmpty ram
+        res' = nonEmpty_ . filter (\f -> x == unFid (frameId f)) $ getNonEmpty ram
         in res == head res'
 
 spec :: Spec
 spec = do 
     describe "idToOff and offToId roundabout" $ do 
-        it "idToOff . offToId == id" $ Q.property $ idToOffToId
-        it "offToId . idToOff == id" $ Q.property $ offToIdToOff
-        it "getFrame tests" $ Q.property $ getFrameTest
+        it "idToOff . offToId == id" $ Q.property idToOffToId
+        it "offToId . idToOff == id" $ Q.property offToIdToOff
+        it "getFrame tests" $ Q.property getFrameTest
