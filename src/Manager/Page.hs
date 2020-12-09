@@ -46,7 +46,7 @@ instance Pages 'Ram where
 
   getPage fid = do
     (ram, _) <- get @PageTable
-    let frM = find (\Page { frId } -> frId == fid) ram
+    let frM = find (\Page { frameId } -> frameId == fid) ram
     return frM
   
   movePage p@Page { pId } fid = do
@@ -64,7 +64,7 @@ instance Pages 'Swap where
 
   getPage fid = do
     (_, sw) <- get @PageTable
-    let frM = find (\Page { frId } -> frId == fid) sw
+    let frM = find (\Page { frameId } -> frameId == fid) sw
     return frM
   
   movePage p@Page { pId } fid = do

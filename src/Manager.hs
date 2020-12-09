@@ -9,7 +9,7 @@ module Manager
   , module Types
   , module Manager.Page
   -- , module Manager.Frame
-  , module Manager.Env
+  , module Env
   )
 where
 

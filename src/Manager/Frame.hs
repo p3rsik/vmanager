@@ -9,7 +9,7 @@ module Manager.Frame
 import Foundation
 import Foundation.Collection
 import Control.Effect.State
-import Manager.Types
+import Types
 import Manager.Page
 import Data.Bits
 
