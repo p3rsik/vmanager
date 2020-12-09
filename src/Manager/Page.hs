@@ -11,7 +11,7 @@ import Control.Effect.State
 import Types
 
 data Page (a :: MemType) = Page
-            { frId :: FrameId a
+            { frameId :: FrameId a
             , age :: Age -- internal age of page, used in alg
             , wBit :: Bool -- If some process is writing this page now, then no other process can write it
             , rBit :: Bool -- -//- (writing -> reading)

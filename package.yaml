@@ -44,6 +44,8 @@ library:
     - DerivingVia
     - FlexibleInstances
     - RecordWildCards
+    - DisambiguateRecordFields
+    - ScopedTypeVariables
 
 executables:
   vmanager-exe:

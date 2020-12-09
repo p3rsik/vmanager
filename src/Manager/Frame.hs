@@ -9,7 +9,9 @@ module Manager.Frame
 import Foundation
 import Foundation.Collection
 import Control.Effect.State
-import Types
+import Manager.Types
+import Manager.Page
+import Data.Bits
 
 data Frame (a :: MemType) = Frame
              { frameId :: FrameId a -- Actually, FrameId is also Frame offset
@@ -35,6 +37,7 @@ class Frames a where
   getFrame :: Has (State FrameTable) sig m => FrameId a -> m (Frame a)
   writeFrame :: Has (State FrameTable) sig m => Frame a -> Offset Word8 -> [Word8] -> m ()
   readFrame :: Has (State FrameTable) sig m => Frame a -> Offset Word8 -> CountOf Word8 -> m [Word8]
+  ageRam :: Has (State PageTable) sig m => Page a -> m ()
 
 readFrame' :: Has (State FrameTable) sib m => Frame a -> Offset Word8 -> CountOf Word8 -> m [Word8]
 readFrame' (Frame _ mem') (Offset off) co = do 
@@ -75,6 +78,17 @@ instance Frames 'Ram where
 
   readFrame = readFrame'
 
+  ageRam p = do
+    modify @PageTable . first $ fmap agePage' 
+    where
+      agePage' :: Page 'Ram -> Page 'Ram
+      agePage' p'@Page { age } =
+        let age' = unAge age 
+            newAge = Age $ if p == p' 
+                           then setBit (shiftR age' 1) (finiteBitSize age' - 1)
+                           else shiftR age' 1 in
+        p'{ age = newAge }
+
 instance Frames 'Swap where
   getFreeFrameOffset = do
     (FT rfo ram sfo swap') <- get
@@ -106,3 +120,5 @@ instance Frames 'Swap where
     modify $ \(FT rfo ram sfo swap') -> FT rfo ram sfo $ replace swap'
 
   readFrame = readFrame'
+
+  ageRam _ = return ()

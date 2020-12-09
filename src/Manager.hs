@@ -8,12 +8,11 @@ module Manager
   , ManagerSig
   , module Types
   , module Manager.Page
-  , module Manager.Frame
-  , module Env
+  -- , module Manager.Frame
+  , module Manager.Env
   )
 where
 
--- import Data.Bits
 import Foundation
 import Control.Effect.State
 import Control.Effect.Catch
@@ -48,20 +47,20 @@ allocPage pid = do
     -- otherwise move specific page to swap and alloc a new page
     Nothing -> do
       -- unload a page to swap and create a new one instead
-      p@Page { frId } <- findPageToUnload
+      p@Page { frameId } <- findPageToUnload
       moveToSwap p
 
-      np <- createPage frId pid
-      setFrameNotFree frId
+      np <- createPage frameId pid
+      setFrameNotFree frameId
 
       return np
 
 
 -- Find corresponding frame and mark it free, then delete page from pool of pages
 freePage :: (Pages a, Frames a, ManagerSig sig m) => Page a -> m ()
-freePage p@Page { frId } = do
+freePage p@Page { frameId } = do
   deletePage p
-  setFrameFree frId
+  setFrameFree frameId
 
 
 -- Load page from SWAP to RAM
@@ -74,8 +73,8 @@ moveToRam p@Page { pId } = do
 
 -- Copy memory from one page to another
 copyMem :: (Pages a, Frames a, Pages b, Frames b, ManagerSig sig m) => Page a -> Page b -> m ()
-copyMem Page { frId } t = do
-  (Frame _ mem) <- getFrame frId
+copyMem Page { frameId } t = do
+  (Frame _ mem) <- getFrame frameId
   writeMem t (Offset 0) mem
 
 
@@ -96,27 +95,27 @@ moveToSwap p@Page { pId } = do
 
 -- Write memory to the page
 writeMem :: (Pages a, Frames a, ManagerSig sig m) => Page a -> Offset Word8 -> [Word8] -> m ()
-writeMem Page { frId } off mem = do
-  f <- getFrame frId
+writeMem p@Page { frameId } off mem = do
+  f <- getFrame frameId
+  ageRam p
   writeFrame f off mem
 
 
 -- Read memory from the page
 readMem :: (Pages a, Frames a, ManagerSig sig m) => Page a -> Offset Word8 -> CountOf Word8 -> m [Word8]
-readMem Page { frId } off count = do
-  f <- getFrame frId
+readMem p@Page { frameId } off count = do
+  f <- getFrame frameId
+  ageRam p
   readFrame f off count
 
-
--- ageWorld :: (MonadError String m, MonadReader Env m, MonadIO m) => m ()
--- ageWorld = do
-  -- env <- ask
-  -- liftIO . modifyIORef' (pageTable env) $ fmap agePage
+-- ageRam :: ManagerSig sig m => Page 'Ram -> m ()
+-- ageRam p = do
+  -- modify @PageTable . first $ fmap agePage' 
   -- where
-    -- agePage :: Page -> Page
-    -- agePage (Page fi c ir w r pid) =
-      -- let c' =
-            -- if r
-              -- then setBit (shiftR c 1) (finiteBitSize c - 1)
-              -- else shiftR c 1
-       -- in Page fi c' ir w r pid
+    -- agePage' :: Page 'Ram -> Page 'Ram
+    -- agePage' p'@Page { age } =
+      -- let age' = unAge age in
+      -- let newAge = Age $ if p == p' 
+                         -- then setBit (shiftR age' 1) (finiteBitSize age' - 1)
+                         -- else shiftR age' 1
+      -- in p'{ age = newAge }
